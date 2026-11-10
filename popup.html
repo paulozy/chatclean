@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChatClean</title>
+  <link rel="stylesheet" href="src/popup.css">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div class="brand-mark">CC</div>
+      <div>
+        <h1>ChatClean</h1>
+        <p>Seu chat, suas regras.</p>
+      </div>
+      <span class="version">v0.1.1</span>
+    </header>
+
+    <section class="status-row">
+      <div>
+        <strong>Extensão ativa</strong>
+        <small>Aplica filtros no chat da Kick</small>
+      </div>
+      <label class="switch" aria-label="Ativar extensão">
+        <input id="enabled" type="checkbox">
+        <span class="slider"></span>
+      </label>
+    </section>
+
+    <section class="filter-card">
+      <div class="filter-heading">
+        <div>
+          <strong>Resgates do PokeIdle</strong>
+          <small>Oculta avisos de bônus resgatados</small>
+        </div>
+        <label class="switch" aria-label="Ativar filtro PokeIdle">
+          <input id="pokeidle" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="example">
+        <span class="dot"></span>
+        <span>resgatou Bônus +15% XP Pokeld</span>
+      </div>
+    </section>
+
+    <footer>
+      <span id="save-status">Configurações salvas neste navegador.</span>
+      <span>Processamento local · Sem login</span>
+    </footer>
+  </main>
+  <script src="src/popup.js"></script>
+</body>
+</html>

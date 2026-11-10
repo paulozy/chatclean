@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "ChatClean",
+  "version": "0.1.1",
+  "description": "Limpa mensagens automáticas e repetitivas dos chats da Kick.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://kick.com/*"],
+  "action": {
+    "default_title": "ChatClean",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://kick.com/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
