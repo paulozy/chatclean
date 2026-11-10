@@ -2,100 +2,90 @@
   if (window.__chatCleanInitialized) return;
   window.__chatCleanInitialized = true;
 
-  const STYLE_ID = "chatclean-style";
   const HIDDEN_CLASS = "chatclean-hidden";
-  const REWARD_PATTERN = /resgatou\s+b[oô]nus\b/i;
-  const MESSAGE_SELECTORS = [
-    '[data-testid*="chat-message" i]',
-    '[class*="chat-message" i]',
-    '[class*="chatMessage" i]',
-    '[class*="chat-entry" i]',
-    '[class*="ChatEntry" i]',
-    '[class*="message-container" i]',
-    '[class*="MessageContainer" i]'
-  ].join(",");
-
+  // Match all PokeIdle reward redemption variants, regardless of reward type.
+  const REWARD_PATTERN = /\bresgatou\s+b[oô]nus\b/i;
   let settings = { enabled: true, filters: { pokeidleRewards: true } };
   let scanQueued = false;
 
   const style = document.createElement("style");
-  style.id = STYLE_ID;
   style.textContent = `.${HIDDEN_CLASS}{display:none!important}`;
   (document.documentElement || document.head).appendChild(style);
 
-  function normalizedText(el) {
-    return (el?.innerText || el?.textContent || "")
-      .replace(/\s+/g, " ")
-      .trim();
+  function textOf(el) {
+    return (el?.innerText || el?.textContent || "").replace(/\s+/g, " ").trim();
   }
 
-  function isRewardMessage(el) {
-    return REWARD_PATTERN.test(normalizedText(el));
+  function isTarget(el) {
+    const text = textOf(el);
+    return text.length > 0 && text.length < 500 && REWARD_PATTERN.test(text);
   }
 
-  function findMessageContainer(el) {
-    const explicit = el.closest(MESSAGE_SELECTORS);
-    if (explicit && explicit !== document.body && explicit !== document.documentElement) {
-      const text = normalizedText(explicit);
-      if (text.length <= 350 && explicit.querySelectorAll('*').length <= 18 && isRewardMessage(explicit)) return explicit;
-    }
+  function findRow(el) {
+    // Prefer semantic chat-row containers used by many chat implementations.
+    const semantic = el.closest(
+      '[data-testid*="chat-message" i], [data-testid*="message" i], ' +
+      '[role="listitem"], li, article, [class*="chat-message" i], ' +
+      '[class*="chatMessage" i], [class*="message-container" i]'
+    );
+    if (semantic && semantic !== document.body && isTarget(semantic)) return semantic;
 
-    // Fallback para mudanças no HTML da Kick: sobe poucos níveis e escolhe
-    // o menor bloco razoável que contém a mensagem inteira.
+    // Walk upward from the matching text and retain the smallest compact
+    // ancestor that still contains the complete reward message.
     let node = el;
-    let fallback = null;
-    for (let i = 0; i < 6 && node && node.parentElement; i++) {
-      node = node.parentElement;
-      if (node === document.body || node === document.documentElement) break;
-      const text = normalizedText(node);
-      if (text.length > 350) break;
-      if (isRewardMessage(node) && node.children.length <= 12) {
-        fallback = node;
-        if (node.matches("div, li, article") && i >= 1) break;
-      }
+    let best = el;
+    for (let i = 0; i < 7 && node.parentElement; i++) {
+      const parent = node.parentElement;
+      if (parent === document.body || parent === document.documentElement) break;
+      const text = textOf(parent);
+      if (text.length > 500) break;
+      if (REWARD_PATTERN.test(text)) best = parent;
+      node = parent;
     }
-    return fallback;
+    // A little context is usually needed to hide the complete chat row.
+    if (best.parentElement && best.parentElement !== document.body &&
+        textOf(best.parentElement).length < 500 &&
+        REWARD_PATTERN.test(textOf(best.parentElement))) {
+      best = best.parentElement;
+    }
+    return best;
   }
 
-  function processElement(el) {
-    if (!(el instanceof Element)) return;
-    if (!settings.enabled || settings.filters?.pokeidleRewards === false) {
-      if (el.classList.contains(HIDDEN_CLASS)) el.classList.remove(HIDDEN_CLASS);
-      el.querySelectorAll?.("." + HIDDEN_CLASS).forEach(n => n.classList.remove(HIDDEN_CLASS));
-      return;
-    }
-
-    if (el.classList.contains(HIDDEN_CLASS)) return;
-    if (!isRewardMessage(el)) return;
-
-    const container = findMessageContainer(el);
-    if (container && !container.classList.contains(HIDDEN_CLASS)) {
-      container.classList.add(HIDDEN_CLASS);
-      container.setAttribute("data-chatclean-hidden", "pokeidle-reward");
-    }
-  }
-
-  function scan(root = document) {
-    if (!settings.enabled || settings.filters?.pokeidleRewards === false) {
-      root.querySelectorAll?.("[data-chatclean-hidden]").forEach(el => {
-        el.classList.remove(HIDDEN_CLASS);
-        el.removeAttribute("data-chatclean-hidden");
-      });
-      return;
-    }
-
-    if (root instanceof Element && isRewardMessage(root)) processElement(root);
-    root.querySelectorAll?.("div,li,article,[role='listitem']").forEach(el => {
-      if (isRewardMessage(el)) processElement(el);
+  function clearHidden() {
+    document.querySelectorAll("[data-chatclean-hidden]").forEach(el => {
+      el.classList.remove(HIDDEN_CLASS);
+      el.removeAttribute("data-chatclean-hidden");
     });
   }
 
-  function queueScan(root) {
+  function scan() {
+    if (!settings.enabled || settings.filters?.pokeidleRewards === false) {
+      clearHidden();
+      return;
+    }
+
+    // Inspect all elements so this also catches chat rows whose text is
+    // updated in-place rather than inserted as a new DOM node.
+    const all = document.querySelectorAll("div, li, article, [role='listitem'], span");
+    for (const el of all) {
+      if (el.classList.contains(HIDDEN_CLASS) || !isTarget(el)) continue;
+
+      // Ignore large wrappers containing multiple messages.
+      const row = findRow(el);
+      if (!row || row === document.body || row === document.documentElement) continue;
+      if (!row.hasAttribute("data-chatclean-hidden")) {
+        row.classList.add(HIDDEN_CLASS);
+        row.setAttribute("data-chatclean-hidden", "pokeidle-reward");
+      }
+    }
+  }
+
+  function queueScan() {
     if (scanQueued) return;
     scanQueued = true;
     requestAnimationFrame(() => {
       scanQueued = false;
-      scan(root);
+      scan();
     });
   }
 
@@ -104,7 +94,7 @@
       enabled: data.enabled !== false,
       filters: { pokeidleRewards: data.filters?.pokeidleRewards !== false }
     };
-    scan(document);
+    queueScan();
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -113,24 +103,18 @@
     if (changes.filters) settings.filters = {
       pokeidleRewards: changes.filters.newValue?.pokeidleRewards !== false
     };
-    scan(document);
+    queueScan();
   });
 
-  const observer = new MutationObserver(mutations => {
-    for (const mutation of mutations) {
-      if (mutation.type === "childList") {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE) queueScan(node);
-        });
-      } else if (mutation.type === "characterData") {
-        queueScan(mutation.target.parentElement || document);
-      }
-    }
-  });
-
+  // Scan the full chat after any DOM mutation. This covers both newly added
+  // messages and existing message nodes whose contents are changed in place.
+  const observer = new MutationObserver(() => queueScan());
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
     characterData: true
   });
+
+  // Kick's chat can hydrate after the content script starts.
+  queueScan();
 })();

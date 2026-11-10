@@ -1,4 +1,4 @@
-# ChatClean v0.1.1
+# ChatClean v0.1.2
 
 Extensão MV3 para ocultar visualmente mensagens automáticas no chat nativo da Kick.
 
